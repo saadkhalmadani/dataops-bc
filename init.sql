@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS bootcamp_schema.student (
 )
 TABLESPACE ts_bootcamp;
 
+
 -- 09. Index for student foreign key
 CREATE INDEX IF NOT EXISTS idx_student_squad_name
   ON bootcamp_schema.student(squad_name);
