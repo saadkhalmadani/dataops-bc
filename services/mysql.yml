@@ -1,0 +1,18 @@
+services:
+
+    mysql:
+        image: mysql:9.3.0
+        hostname: mysql
+        container_name: mysql
+        restart: always
+        ports:
+          - ${MYSQL_PORT}:3306       # The default port for the MySQL Classic Protocol
+          - ${MYSQLX_PORT}:33060     # the default port for MySQL X Protocol
+        volumes:
+          - mysql-data:/var/lib/mysql
+        healthcheck:
+          test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_ROOT_PASSWORD}"]
+          interval: 30s
+          timeout: 10s
+          retries: 5
+          start_period: 30s

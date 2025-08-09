@@ -1,0 +1,23 @@
+networks:
+  default:
+    name: my-net
+    external: true
+
+volumes:
+  mysql-data:
+  postgres-data:
+
+
+services:
+
+  mysql:
+    env_file: env/mysql.env
+    extends: 
+      file: services/mysql.yml
+      service: mysql
+
+  postgres:
+    env_file: env/postgres.env
+    extends: 
+      file: services/postgres.yml
+      service: postgres
