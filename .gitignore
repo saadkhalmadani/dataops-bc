@@ -1,6 +1,3 @@
 .venv/
 .uv/
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
