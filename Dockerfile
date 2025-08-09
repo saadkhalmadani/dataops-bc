@@ -6,4 +6,4 @@ RUN mkdir -p /ts_bootcamp_data \
     && chmod 700 /ts_bootcamp_data
 
 USER postgres
-COPY init.sql /docker-entrypoint-initdb.d/init.sql
+COPY init/init.sql /docker-entrypoint-initdb.d/init.sql
