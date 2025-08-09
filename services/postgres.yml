@@ -5,7 +5,7 @@ services:
       hostname: postgres
       container_name: postgres
       ports:
-        - ${POSTGRES_PORT}:5432
+        - ${POSTGRES_V2_PORT}:5432
       command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=10", "-c", "max_wal_senders=10"]
       volumes:
         - postgres-data:/var/lib/postgresql/data
