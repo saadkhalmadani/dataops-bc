@@ -8,6 +8,11 @@ services:
         ports:
           - ${MYSQL_PORT}:3306       # The default port for the MySQL Classic Protocol
           - ${MYSQLX_PORT}:33060     # the default port for MySQL X Protocol
+        environment:
+          MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}    
+          MYSQL_USER: ${MYSQL_USER}                   
+          MYSQL_PASSWORD: ${MYSQL_PASSWORD}               
+          MYSQL_DATABASE: ${MYSQL_DATABASE}     
         volumes:
           - mysql-data:/var/lib/mysql
         healthcheck:

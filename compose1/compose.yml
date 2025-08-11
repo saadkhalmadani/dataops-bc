@@ -3,21 +3,20 @@ volumes:
   pgdata:
   ts_bootcamp_data:
   cloudbeaver_data:
-  mysql-data:
-  postgres-data:
 
 networks:
   default:
-    name: global-net
+    name: primary-net    
     external: true
       
 services:
 
   db:
-    build: .
+    build: 
+      context: ..
+      dockerfile: Dockerfile
     image: my-postgres
     container_name: postgres_bootcamp
-    env_file: .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -48,14 +47,4 @@ services:
     volumes: 
       - cloudbeaver_data:/opt/cloudbeaver/workspace
 
-  mysql:
-    env_file: env/mysql.env
-    extends: 
-      file: services/mysql.yml
-      service: mysql
 
-  postgres:
-    env_file: env/postgres.env
-    extends: 
-      file: services/postgres.yml
-      service: postgres

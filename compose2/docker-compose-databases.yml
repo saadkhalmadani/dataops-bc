@@ -1,0 +1,20 @@
+networks:
+  default:
+    name: secondary-net
+    external: true
+
+volumes:
+  postgres-data:
+  mysql-data:
+
+services:
+  
+  mysql:
+    extends: 
+      file: ../services/mysql.yml
+      service: mysql
+
+  postgres:
+    extends: 
+      file: ../services/postgres.yml
+      service: postgres
