@@ -1,0 +1,72 @@
+Running backup job on Wed Aug 13 17:06:01 +01 2025...
+Processing file from container: Starting backup process...
+Error response from daemon: Could not find the file Starting backup process... in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Processing file from container: Creating .dump file...
+Error response from daemon: Could not find the file Creating .dump file... in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Processing file from container: Creating .sql file...
+Error response from daemon: Could not find the file Creating .sql file... in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Processing file from container: /var/lib/postgresql/data/backups/bootcamp_db_2025-08-13_16-06-01.dump
+Successfully copied backup to host at /home/saadkh/dataops-bc/postgres_backups
+Processing file from container: /var/lib/postgresql/data/backups/bootcamp_db_2025-08-13_16-06-01.sql
+Successfully copied backup to host at /home/saadkh/dataops-bc/postgres_backups
+Processing file from container: Both backup files created inside container.
+Error response from daemon: Could not find the file Both backup files created inside container. in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Backup process finished successfully.
+Running backup job on Wed Aug 13 17:12:00 +01 2025...
+Processing file from container: Starting backup process...
+Error response from daemon: Could not find the file Starting backup process... in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Processing file from container: Creating .dump file...
+Error response from daemon: Could not find the file Creating .dump file... in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Processing file from container: Creating .sql file...
+Error response from daemon: Could not find the file Creating .sql file... in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Processing file from container: /var/lib/postgresql/data/backups/bootcamp_db_2025-08-13_16-12-00.dump
+Successfully copied backup to host at /home/saadkh/dataops-bc/postgres_backups
+Processing file from container: /var/lib/postgresql/data/backups/bootcamp_db_2025-08-13_16-12-00.sql
+Successfully copied backup to host at /home/saadkh/dataops-bc/postgres_backups
+Processing file from container: Both backup files created inside container.
+Error response from daemon: Could not find the file Both backup files created inside container. in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Backup process finished successfully.
+Running backup job on Wed Aug 13 17:18:01 +01 2025...
+Processing file from container: Starting backup process...
+Error response from daemon: Could not find the file Starting backup process... in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Processing file from container: Creating .dump file...
+Error response from daemon: Could not find the file Creating .dump file... in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Processing file from container: Creating .sql file...
+Error response from daemon: Could not find the file Creating .sql file... in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Processing file from container: /var/lib/postgresql/data/backups/bootcamp_db_2025-08-13_16-18-01.dump
+Successfully copied backup to host at /home/saadkh/dataops-bc/postgres_backups
+Processing file from container: /var/lib/postgresql/data/backups/bootcamp_db_2025-08-13_16-18-01.sql
+Successfully copied backup to host at /home/saadkh/dataops-bc/postgres_backups
+Processing file from container: Both backup files created inside container.
+Error response from daemon: Could not find the file Both backup files created inside container. in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Backup process finished successfully.
+Running backup job on Wed Aug 13 17:24:00 +01 2025...
+Processing file from container: Starting backup process...
+Error response from daemon: Could not find the file Starting backup process... in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Processing file from container: Creating .dump file...
+Error response from daemon: Could not find the file Creating .dump file... in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Processing file from container: Creating .sql file...
+Error response from daemon: Could not find the file Creating .sql file... in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Processing file from container: /var/lib/postgresql/data/backups/bootcamp_db_2025-08-13_16-24-00.dump
+Successfully copied backup to host at /home/saadkh/dataops-bc/postgres_backups
+Processing file from container: /var/lib/postgresql/data/backups/bootcamp_db_2025-08-13_16-24-00.sql
+Successfully copied backup to host at /home/saadkh/dataops-bc/postgres_backups
+Processing file from container: Both backup files created inside container.
+Error response from daemon: Could not find the file Both backup files created inside container. in container postgres_bootcamp
+ERROR: Failed to copy backup file from container to host.
+Backup process finished successfully.
