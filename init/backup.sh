@@ -8,16 +8,32 @@ BASE_NAME="${BASE_NAME:-bootcamp_db_$TIMESTAMP}"
 DUMP_FILE="$BACKUP_DIR/$BASE_NAME.dump"
 SQL_FILE="$BACKUP_DIR/$BASE_NAME.sql"
 
+# Defaults
 PGHOST="${PGHOST:-db}"
 PGPORT="${PGPORT:-5434}"
 PGUSER="${PGUSER:-bootcamp_admin}"
 PGDATABASE="${PGDATABASE:-bootcamp_db}"
 PGPASSWORD="${PGPASSWORD:-secure_password}"
 
+# Parse DATABASE_URL if provided
+if [[ -n "${DATABASE_URL:-}" ]]; then
+  regex='^postgres:\/\/([^:]+):([^@]+)@([^:]+):([0-9]+)\/(.+)$'
+  if [[ "$DATABASE_URL" =~ $regex ]]; then
+    PGUSER="${BASH_REMATCH[1]}"
+    PGPASSWORD="${BASH_REMATCH[2]}"
+    PGHOST="${BASH_REMATCH[3]}"
+    PGPORT="${BASH_REMATCH[4]}"
+    PGDATABASE="${BASH_REMATCH[5]}"
+  else
+    echo "❌ DATABASE_URL is invalid format: $DATABASE_URL" >&2
+    exit 1
+  fi
+fi
+
 mkdir -p "$BACKUP_DIR"
 trap 'echo "❌ Backup failed at $(date)" >&2' ERR
 
-echo "🚀 Starting backup for database: $PGDATABASE"
+echo "🚀 Starting backup for database: $PGDATABASE on $PGHOST:$PGPORT"
 
 if [ -z "${PGPASSWORD:-}" ]; then
   echo "ERROR: PGPASSWORD is not set. Use repository/Actions secrets." >&2

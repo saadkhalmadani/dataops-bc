@@ -2,8 +2,13 @@ name: Backup & Restore
 
 on:
   workflow_dispatch:
+    inputs:
+      restore:
+        description: 'Run restore job?'
+        required: false
+        default: 'false'
   schedule:
-    - cron: '*/3 * * * *'   # Runs every 3 minutes
+    - cron: '*/3 * * * *'   # Every 3 minutes
 
 jobs:
   backup:
@@ -22,7 +27,7 @@ jobs:
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4
         with:
-          name: db-backup-$(date +'%Y%m%d%H%M')
+          name: db-backup-${{ github.run_id }}
           path: ./backups/
 
   restore:
@@ -35,7 +40,7 @@ jobs:
       - name: Download latest backup
         uses: actions/download-artifact@v4
         with:
-          name: db-backup-$(date +'%Y%m%d%H%M')
+          name: db-backup-${{ github.run_id }}
 
       - name: Run restore script
         run: |
