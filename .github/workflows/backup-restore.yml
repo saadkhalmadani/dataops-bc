@@ -1,5 +1,8 @@
 name: Postgres Backup
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [ main ]
@@ -27,6 +30,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Make script executable
         run: chmod +x ./cron_job_runner.sh
@@ -71,22 +76,26 @@ jobs:
 
       - name: 'Debug: list backups directory'
         run: |
-          echo Workspace: $GITHUB_WORKSPACE
-          ls -la $GITHUB_WORKSPACE || true
-          ls -la $GITHUB_WORKSPACE/postgres_backups || echo postgres_backups not found
-          echo Find .gz files:
-          find $GITHUB_WORKSPACE -type f -name *.gz -maxdepth 4 -ls || true
+          echo "Workspace: $GITHUB_WORKSPACE"
+          ls -la "$GITHUB_WORKSPACE" || true
+          ls -la "$GITHUB_WORKSPACE/postgres_backups" || echo "postgres_backups not found"
+          echo "Find .gz files:"
+          find "$GITHUB_WORKSPACE" -type f -name '*.gz' -maxdepth 4 -ls || true
 
       - name: Generate backups CSV
+        id: gen_csv
         run: |
           set -euo pipefail
           OUT_DIR="$GITHUB_WORKSPACE/postgres_backups"
           mkdir -p "$OUT_DIR"
           OUT="$OUT_DIR/backups.csv"
           echo "filename,path,timestamp,size_bytes" > "$OUT"
+          # ensure shell globbing doesn't expand to literal if no matches
           shopt -s nullglob || true
+          found=0
           for f in "$OUT_DIR"/*.gz; do
             [ -e "$f" ] || continue
+            found=1
             fn=$(basename "$f")
             # modification time in UTC, format YYYY-MM-DDTHH:MM:SSZ
             mtime=$(date -u -d "@$(stat -c %Y "$f")" +"%Y-%m-%dT%H:%M:%SZ")
@@ -95,13 +104,54 @@ jobs:
             safe_fn="${fn//,/\\,}"
             echo "${safe_fn},postgres_backups,${mtime},${size}" >> "$OUT"
           done
+          if [ "$found" -eq 0 ]; then
+            echo "No .gz backup files found; generated CSV will contain only header."
+          fi
           echo "Generated $OUT"
           ls -la "$OUT_DIR" || true
           echo "Contents of CSV:"
           sed -n '1,200p' "$OUT" || true
+          # expose whether CSV has backups via GITHUB_OUTPUT
+          if [ "$found" -eq 1 ]; then
+            echo "has_backups=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_backups=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4
         with:
           name: postgres-backups
           path: ${{ github.workspace }}/postgres_backups/**
+
+      - name: Commit backups CSV to backups/list branch
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          OUT_DIR="$GITHUB_WORKSPACE/postgres_backups"
+          CSV="$OUT_DIR/backups.csv"
+          if [ ! -f "$CSV" ]; then
+            echo "No CSV to commit; skipping."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # create a temporary commit containing the CSV at backups/backups.csv on branch backups/list
+          git checkout --detach
+
+          mkdir -p backups
+          cp "$CSV" backups/backups.csv
+
+          git add backups/backups.csv
+          # If there are no staged changes, skip commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit to backups/list"
+            exit 0
+          fi
+
+          git commit -m "Update backups.csv from workflow run $GITHUB_RUN_ID"
+          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}" HEAD:refs/heads/backups/list
