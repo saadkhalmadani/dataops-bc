@@ -4,6 +4,7 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+  # Consider reducing frequency if not required; heavy schedules may be noisy/costly.
   schedule:
     - cron: '*/2 * * * *'
 
@@ -20,9 +21,9 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U bootcamp_admin" 
-          --health-interval 10s 
-          --health-timeout 5s 
+          --health-cmd "pg_isready -U bootcamp_admin"
+          --health-interval 10s
+          --health-timeout 5s
           --health-retries 5
 
     steps:
@@ -32,9 +33,14 @@ jobs:
         run: chmod +x ./cron_job_runner.sh
 
       - name: Run backup
+        # Provide DB credentials to the step runner (service env is not propagated to runner steps)
         env:
           HOST_BACKUP_DIR: ${{ github.workspace }}/postgres_backups
-          DB_HOST: db
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: bootcamp_admin
+          DB_PASSWORD: secure_password
+          DB_NAME: bootcamp_db
         run: ./cron_job_runner.sh
 
       - name: Upload backup
