@@ -5,9 +5,9 @@
 HOST_BACKUP_DIR="${HOST_BACKUP_DIR:-$PWD/postgres_backups}"
 DB_NAME="${DB_NAME:-bootcamp_db}"
 DB_USER="${DB_USER:-bootcamp_admin}"
-DB_PASSWORD="${DB_PASSWORD:-secret123}"
-DB_HOST="${DB_HOST:-postgres}"  # Service hostname in GitHub Actions
-DB_PORT="${DB_PORT:-5432}"
+DB_PASSWORD="${DB_PASSWORD:-secure_password}"
+DB_HOST="${DB_HOST:-db}"  # Service hostname in GitHub Actions
+DB_PORT="${DB_PORT:-5434}"
 
 # --- Ensure backup directory exists ---
 mkdir -p "$HOST_BACKUP_DIR"
