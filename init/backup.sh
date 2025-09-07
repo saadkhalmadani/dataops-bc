@@ -12,6 +12,7 @@ PGHOST="${PGHOST:-localhost}"
 PGPORT="${PGPORT:-5432}"
 PGUSER="${PGUSER:-backup_user}"
 PGDATABASE="${PGDATABASE:-bootcamp_db}"
+PGPASSWORD="${PGPASSWORD:-secure_password}"
 
 mkdir -p "$BACKUP_DIR"
 trap 'echo "❌ Backup failed at $(date)" >&2' ERR
