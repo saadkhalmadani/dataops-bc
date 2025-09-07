@@ -10,7 +10,7 @@ SQL_FILE="$BACKUP_DIR/$BASE_NAME.sql"
 
 PGHOST="${PGHOST:-localhost}"
 PGPORT="${PGPORT:-5434}"
-PGUSER="${PGUSER:-backup_user}"
+PGUSER="${PGUSER:-bootcamp_admin}"
 PGDATABASE="${PGDATABASE:-bootcamp_db}"
 PGPASSWORD="${PGPASSWORD:-secure_password}"
 
