@@ -27,7 +27,7 @@ if [ -z "$DB_NAME" ]; then
   exit 1
 fi
 
-# Wait for Postgres
+# Wait for Postgres to be ready
 until PGPASSWORD="$DB_PASSWORD" pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" > /dev/null 2>&1; do
   echo "Waiting for Postgres to be ready at ${DB_HOST}:${DB_PORT}..."
   sleep 2

@@ -68,7 +68,7 @@ jobs:
 
           echo "Backup saved to $OUTFILE"
 
-      - name: 'Debug: list backups directory'
+      - name: "Debug: list backups directory"
         run: |
           echo "Workspace: $GITHUB_WORKSPACE"
           ls -la "$GITHUB_WORKSPACE" || true
