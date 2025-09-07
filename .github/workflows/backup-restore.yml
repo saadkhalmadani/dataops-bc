@@ -2,9 +2,9 @@ name: Postgres Backup
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   schedule:
-    - cron: '*/2 * * * *'
+    - cron: '*/5 * * * *'
 
 jobs:
   backup:
@@ -25,7 +25,8 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Make script executable
         run: chmod +x ./cron_job_runner.sh
@@ -37,6 +38,7 @@ jobs:
           DB_PASSWORD: secure_password
           DB_NAME: bootcamp_db
         run: |
+          set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/postgres_backups"
 
           # Find the running Postgres service container (match the image used by the service)
@@ -67,15 +69,38 @@ jobs:
 
           echo "Backup saved to $OUTFILE"
 
-      - name: "Debug: list backups directory"
+      - name: 'Debug: list backups directory'
         run: |
-          echo "Workspace: $GITHUB_WORKSPACE"
-          ls -la "$GITHUB_WORKSPACE" || true
-          ls -la "$GITHUB_WORKSPACE/postgres_backups" || echo "postgres_backups not found"
-          echo "Find .gz files:"
-          find "$GITHUB_WORKSPACE" -type f -name '*.gz' -maxdepth 4 -ls || true
+          echo Workspace: $GITHUB_WORKSPACE
+          ls -la $GITHUB_WORKSPACE || true
+          ls -la $GITHUB_WORKSPACE/postgres_backups || echo postgres_backups not found
+          echo Find .gz files:
+          find $GITHUB_WORKSPACE -type f -name *.gz -maxdepth 4 -ls || true
 
-      - name: Upload backup
+      - name: Generate backups CSV
+        run: |
+          set -euo pipefail
+          OUT_DIR="$GITHUB_WORKSPACE/postgres_backups"
+          mkdir -p "$OUT_DIR"
+          OUT="$OUT_DIR/backups.csv"
+          echo "filename,path,timestamp,size_bytes" > "$OUT"
+          shopt -s nullglob || true
+          for f in "$OUT_DIR"/*.gz; do
+            [ -e "$f" ] || continue
+            fn=$(basename "$f")
+            # modification time in UTC, format YYYY-MM-DDTHH:MM:SSZ
+            mtime=$(date -u -d "@$(stat -c %Y "$f")" +"%Y-%m-%dT%H:%M:%SZ")
+            size=$(stat -c %s "$f")
+            # escape commas in filename if any
+            safe_fn="${fn//,/\\,}"
+            echo "${safe_fn},postgres_backups,${mtime},${size}" >> "$OUT"
+          done
+          echo "Generated $OUT"
+          ls -la "$OUT_DIR" || true
+          echo "Contents of CSV:"
+          sed -n '1,200p' "$OUT" || true
+
+      - name: Upload backup artifact
         uses: actions/upload-artifact@v4
         with:
           name: postgres-backups

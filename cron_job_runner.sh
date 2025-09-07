@@ -19,7 +19,7 @@ DB_PORT="${POSTGRES_PORT:-${DB_PORT:-5432}}"
 
 mkdir -p "$HOST_BACKUP_DIR"
 
-echo "Running backup job on $(date)..."
+echo "Running backup job on $(date -u +"%Y-%m-%dT%H:%M:%SZ")..."
 
 # Basic validation
 if [ -z "$DB_NAME" ]; then
