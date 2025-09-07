@@ -42,12 +42,6 @@ jobs:
           DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
           BACKUP_PATH: ./backups/
 
-      - name: Create checksum for backup
-        run: |
-          for f in ./backups/*.dump; do
-            sha256sum "$f" > "$f.sha256"
-          done
-
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4
         with:
@@ -81,13 +75,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: db-backup-${{ github.run_id }}
+          path: ./backups/
 
-      - name: Verify backup checksums
+      - name: Verify latest backup checksum
         run: |
-          echo "🔍 Verifying all backup checksums..."
-          for f in ./backups/*.sha256; do
-            sha256sum -c "$f"
-          done
+          echo "🔍 Verifying latest backup checksum..."
+          CHECKSUM_FILE=$(ls -t ./backups/*.sha256 2>/dev/null | head -n1)
+          if [[ -z "$CHECKSUM_FILE" ]]; then
+            echo "❌ No checksum file found!"
+            exit 1
+          fi
+          sha256sum -c "$CHECKSUM_FILE"
 
       - name: Run restore script
         run: |
