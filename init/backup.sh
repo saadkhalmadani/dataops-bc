@@ -34,7 +34,7 @@ fi
 # Defaults
 HOST_BACKUP_DIR="${HOST_BACKUP_DIR:-$(pwd)/postgres_backups}"
 DB_HOST="${DB_HOST:-localhost}"
-DB_PORT="${DB_PORT:-5432}"
+DB_PORT="${DB_PORT:-5434}"
 DB_USER="${DB_USER:-}"
 DB_PASSWORD="${DB_PASSWORD:-}"
 DB_NAME="${DB_NAME:-}"
