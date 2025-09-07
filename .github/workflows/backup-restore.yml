@@ -1,4 +1,4 @@
-name: Backup & Restore
+name: Backup & Restore Database
 
 on:
   workflow_dispatch:
@@ -8,21 +8,22 @@ on:
         required: false
         default: 'false'
   schedule:
-    - cron: '*/2 * * * *'   # Every 2 minutes
+    - cron: '*/5 * * * *'   # Every 5 minutes
 
 jobs:
+
   backup:
     runs-on: ubuntu-latest
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:17-alpine
         env:
           POSTGRES_USER: bootcamp_admin
           POSTGRES_PASSWORD: secure_password
           POSTGRES_DB: bootcamp_db
         ports:
-          - 5432:5432
+          - 5434:5432
         options: >-
           --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
           --health-interval=10s
@@ -37,8 +38,14 @@ jobs:
           chmod +x ./init/backup.sh
           ./init/backup.sh
         env:
-          DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5432/bootcamp_db
+          DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
           BACKUP_PATH: ./backups/
+
+      - name: Create checksum for backup
+        run: |
+          for f in ./backups/*.dump; do
+            sha256sum "$f" > "$f.sha256"
+          done
 
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4
@@ -53,13 +60,13 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:17-alpine
         env:
           POSTGRES_USER: bootcamp_admin
           POSTGRES_PASSWORD: secure_password
           POSTGRES_DB: bootcamp_db
         ports:
-          - 5432:5432
+          - 5434:5432
         options: >-
           --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
           --health-interval=10s
@@ -74,10 +81,17 @@ jobs:
         with:
           name: db-backup-${{ github.run_id }}
 
+      - name: Verify backup checksums
+        run: |
+          echo "🔍 Verifying all backup checksums..."
+          for f in ./backups/*.sha256; do
+            sha256sum -c "$f"
+          done
+
       - name: Run restore script
         run: |
           chmod +x ./init/restore.sh
           ./init/restore.sh
         env:
-          DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5432/bootcamp_db
+          DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
           BACKUP_PATH: ./backups/
