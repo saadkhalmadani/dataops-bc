@@ -1,17 +1,15 @@
 name: Postgres Backup
 
-permissions:
-  contents: write
-
 on:
   push:
     branches: [ main ]
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/2 * * * *'
 
 jobs:
   backup:
     runs-on: ubuntu-latest
+
     services:
       db:
         image: postgres:17-alpine
@@ -30,128 +28,71 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Make script executable
-        run: chmod +x ./cron_job_runner.sh
+        run: chmod +x ./init/backup.sh
 
-      - name: Run backup (pg_dump inside Postgres container to avoid client/server mismatch)
+      - name: Run backup (uses ./init/backup.sh)
+        # Service container is reachable at localhost:5432 from the runner.
         env:
           HOST_BACKUP_DIR: ${{ github.workspace }}/postgres_backups
+          DB_HOST: localhost
+          DB_PORT: 5432
           DB_USER: bootcamp_admin
           DB_PASSWORD: secure_password
           DB_NAME: bootcamp_db
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/postgres_backups"
+          echo "Running ./init/backup.sh with HOST_BACKUP_DIR=$HOST_BACKUP_DIR DB_HOST=$DB_HOST DB_PORT=$DB_PORT DB_NAME=$DB_NAME"
+          ./init/backup.sh
 
-          # Find the running Postgres service container (match the image used by the service)
-          CONTAINER_ID=$(docker ps --filter "ancestor=postgres:17-alpine" --format "{{.ID}}" | head -n1)
-          if [ -z "$CONTAINER_ID" ]; then
-            echo "ERROR: Postgres container not found"
-            docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Names}}"
-            exit 1
-          fi
-          echo "Using Postgres container: $CONTAINER_ID"
-
-          # Wait for Postgres to be ready inside the container
-          until docker exec "$CONTAINER_ID" pg_isready -U "$DB_USER" > /dev/null 2>&1; do
-            echo "Waiting for Postgres inside container..."
-            sleep 2
-          done
-
-          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          OUTFILE="$GITHUB_WORKSPACE/postgres_backups/${DB_NAME}_${TIMESTAMP}.sql.gz"
-
-          # Run pg_dump inside the same container so versions match, pass password via env var
-          docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER_ID" pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$OUTFILE"
-
-          if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-            echo "ERROR: pg_dump failed inside container"
-            exit 1
-          fi
-
-          echo "Backup saved to $OUTFILE"
-
-      - name: 'Debug: list backups directory'
+      - name: "Debug: list backups directory"
         run: |
           echo "Workspace: $GITHUB_WORKSPACE"
           ls -la "$GITHUB_WORKSPACE" || true
+          echo "Backups dir:"
           ls -la "$GITHUB_WORKSPACE/postgres_backups" || echo "postgres_backups not found"
           echo "Find .gz files:"
-          find "$GITHUB_WORKSPACE" -type f -name '*.gz' -maxdepth 4 -ls || true
+          find "$GITHUB_WORKSPACE/postgres_backups" -maxdepth 1 -type f -name '*.gz' -ls || true
+
+      - name: Show where backup.sh saved the file
+        id: show_saved
+        run: |
+          set -euo pipefail
+          OUT_DIR="$GITHUB_WORKSPACE/postgres_backups"
+          if compgen -G "$OUT_DIR/*.gz" > /dev/null; then
+            newest=$(ls -1t "$OUT_DIR"/*.gz | head -n1)
+            echo "Newest backup file: $newest"
+            echo "backup_path=$newest" >> "$GITHUB_OUTPUT"
+          else
+            echo "No .gz backup files found in $OUT_DIR"
+            echo "backup_path=" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Generate backups CSV
-        id: gen_csv
         run: |
           set -euo pipefail
           OUT_DIR="$GITHUB_WORKSPACE/postgres_backups"
           mkdir -p "$OUT_DIR"
           OUT="$OUT_DIR/backups.csv"
           echo "filename,path,timestamp,size_bytes" > "$OUT"
-          # ensure shell globbing doesn't expand to literal if no matches
           shopt -s nullglob || true
-          found=0
           for f in "$OUT_DIR"/*.gz; do
             [ -e "$f" ] || continue
-            found=1
             fn=$(basename "$f")
-            # modification time in UTC, format YYYY-MM-DDTHH:MM:SSZ
             mtime=$(date -u -d "@$(stat -c %Y "$f")" +"%Y-%m-%dT%H:%M:%SZ")
             size=$(stat -c %s "$f")
-            # escape commas in filename if any
             safe_fn="${fn//,/\\,}"
             echo "${safe_fn},postgres_backups,${mtime},${size}" >> "$OUT"
           done
-          if [ "$found" -eq 0 ]; then
-            echo "No .gz backup files found; generated CSV will contain only header."
-          fi
           echo "Generated $OUT"
           ls -la "$OUT_DIR" || true
           echo "Contents of CSV:"
           sed -n '1,200p' "$OUT" || true
-          # expose whether CSV has backups via GITHUB_OUTPUT
-          if [ "$found" -eq 1 ]; then
-            echo "has_backups=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_backups=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4
         with:
           name: postgres-backups
           path: ${{ github.workspace }}/postgres_backups/**
-
-      - name: Commit backups CSV to backups/list branch
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          OUT_DIR="$GITHUB_WORKSPACE/postgres_backups"
-          CSV="$OUT_DIR/backups.csv"
-          if [ ! -f "$CSV" ]; then
-            echo "No CSV to commit; skipping."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # create a temporary commit containing the CSV at backups/backups.csv on branch backups/list
-          git checkout --detach
-
-          mkdir -p backups
-          cp "$CSV" backups/backups.csv
-
-          git add backups/backups.csv
-          # If there are no staged changes, skip commit
-          if git diff --staged --quiet; then
-            echo "No changes to commit to backups/list"
-            exit 0
-          fi
-
-          git commit -m "Update backups.csv from workflow run $GITHUB_RUN_ID"
-          git push --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}" HEAD:refs/heads/backups/list
