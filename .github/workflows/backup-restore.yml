@@ -5,20 +5,20 @@ on:
     branches: [ main ]
   workflow_dispatch:
   schedule:
-    - cron: '*/1 * * * *' # Every minute
+    - cron: '*/2 * * * *'
 
 jobs:
   backup:
     runs-on: ubuntu-latest
     services:
-      postgres:
+      db:
         image: postgres:17-alpine
         env:
           POSTGRES_USER: bootcamp_admin
           POSTGRES_PASSWORD: secure_password
           POSTGRES_DB: bootcamp_db
         ports:
-          - 5434:5432
+          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U bootcamp_admin" 
           --health-interval 10s 
@@ -26,27 +26,18 @@ jobs:
           --health-retries 5
 
     steps:
-      # 1️⃣ Checkout repository
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # 2️⃣ Make cron_job_runner.sh executable
-      - name: Set script permissions
+      - name: Make script executable
         run: chmod +x ./cron_job_runner.sh
 
-      # 3️⃣ Run the backup script
-      - name: Run Postgres backup
+      - name: Run backup
         env:
           HOST_BACKUP_DIR: ${{ github.workspace }}/postgres_backups
-          DB_NAME: bootcamp_db
-          DB_USER: bootcamp_admin
-          DB_PASSWORD: secure_password
           DB_HOST: db
-          DB_PORT: 5434
         run: ./cron_job_runner.sh
 
-      # 4️⃣ Upload backups as artifact
-      - name: Upload backup files
+      - name: Upload backup
         uses: actions/upload-artifact@v4
         with:
           name: postgres-backups
