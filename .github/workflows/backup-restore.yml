@@ -11,6 +11,7 @@ jobs:
   backup:
     runs-on: ubuntu-latest
 
+    # Use explicit service env values here (don't use ${VAR} interpolation that isn't defined).
     services:
       db:
         image: postgres:17-alpine
@@ -18,13 +19,16 @@ jobs:
           POSTGRES_USER: bootcamp_admin
           POSTGRES_PASSWORD: secure_password
           POSTGRES_DB: bootcamp_db
+        # Avoid mounting runner paths as /var/lib/postgresql/data to prevent permission errors.
+        # If you need persistent volumes across runs, consider pushing artifacts or using an external store.
         ports:
           - 5434:5432
         options: >-
-          --health-cmd "pg_isready -U bootcamp_admin"
+          --health-cmd "pg_isready -U bootcamp_admin -d bootcamp_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+          --health-start-period 60s
 
     steps:
       - name: Checkout repository
@@ -32,46 +36,55 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Make backup script executable
-        run: chmod +x ./init/backup.sh
-
-      - name: Run backup (uses ./init/backup.sh)
-        # The Postgres service is reachable from the runner at localhost:5434.
+      - name: Prepare workspace
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/postgres_backups"
-          echo "Running ./init/backup.sh (HOST_BACKUP_DIR=$HOST_BACKUP_DIR DB_HOST=$DB_HOST DB_PORT=$DB_PORT DB_NAME=$DB_NAME)"
-          ./init/backup.sh
+
+      - name: Run pg_dump inside Postgres service container (no mounts on runner)
         env:
-          HOST_BACKUP_DIR: ${{ github.workspace }}/postgres_backups
-          DB_HOST: localhost
-          DB_PORT: 5434
           DB_USER: bootcamp_admin
           DB_PASSWORD: secure_password
           DB_NAME: bootcamp_db
+        run: |
+          set -euo pipefail
 
-      - name: "Debug: list backups directory"
+          # Find the Postgres service container created by Actions (match by image)
+          CONTAINER_ID=$(docker ps --filter "ancestor=postgres:17-alpine" --format "{{.ID}}" | head -n1)
+          if [ -z "$CONTAINER_ID" ]; then
+            echo "ERROR: Postgres service container not found. Listing running containers:"
+            docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Names}}"
+            exit 1
+          fi
+          echo "Using Postgres container: $CONTAINER_ID"
+
+          # Wait for Postgres to be ready inside the container
+          until docker exec "$CONTAINER_ID" pg_isready -U "$DB_USER" > /dev/null 2>&1; do
+            echo "Waiting for Postgres inside container..."
+            sleep 2
+          done
+
+          TIMESTAMP=$(date -u +%Y%m%d_%H%M%S)
+          OUTFILE="$GITHUB_WORKSPACE/postgres_backups/${DB_NAME}_${TIMESTAMP}.sql.gz"
+
+          # Run pg_dump inside the service container and write the gzipped output into the runner workspace
+          docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER_ID" pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$OUTFILE"
+
+          if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+            echo "ERROR: pg_dump inside container failed"
+            exit 1
+          fi
+
+          echo "Backup saved to $OUTFILE"
+
+      - name: "Debug: show backups directory"
         run: |
           echo "Workspace: $GITHUB_WORKSPACE"
           ls -la "$GITHUB_WORKSPACE" || true
-          echo "Backups dir:"
+          echo "Backups dir contents:"
           ls -la "$GITHUB_WORKSPACE/postgres_backups" || echo "postgres_backups not found"
           echo "Find .gz files:"
           find "$GITHUB_WORKSPACE/postgres_backups" -maxdepth 1 -type f -name '*.gz' -ls || true
-
-      - name: Show newest backup path
-        id: show_saved
-        run: |
-          set -euo pipefail
-          OUT_DIR="$GITHUB_WORKSPACE/postgres_backups"
-          if compgen -G "$OUT_DIR/*.gz" > /dev/null; then
-            newest=$(ls -1t "$OUT_DIR"/*.gz | head -n1)
-            echo "Newest backup file: $newest"
-            echo "backup_path=$newest" >> "$GITHUB_OUTPUT"
-          else
-            echo "No .gz backup files found in $OUT_DIR"
-            echo "backup_path=" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Generate backups CSV
         run: |
@@ -84,7 +97,6 @@ jobs:
           for f in "$OUT_DIR"/*.gz; do
             [ -e "$f" ] || continue
             fn=$(basename "$f")
-            # modification time in UTC, format YYYY-MM-DDTHH:MM:SSZ
             mtime=$(date -u -d "@$(stat -c %Y "$f")" +"%Y-%m-%dT%H:%M:%SZ")
             size=$(stat -c %s "$f")
             safe_fn="${fn//,/\\,}"
@@ -92,7 +104,6 @@ jobs:
           done
           echo "Generated $OUT"
           ls -la "$OUT_DIR" || true
-          echo "Contents of CSV:"
           sed -n '1,200p' "$OUT" || true
 
       - name: Upload backup artifact
