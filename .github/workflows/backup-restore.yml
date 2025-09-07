@@ -32,16 +32,42 @@ jobs:
       - name: Make script executable
         run: chmod +x ./cron_job_runner.sh
 
-      - name: Run backup
-        # Provide DB credentials to the step runner (service env is not propagated to runner steps)
+      - name: Run backup (execute pg_dump inside Postgres container to avoid version mismatch)
         env:
           HOST_BACKUP_DIR: ${{ github.workspace }}/postgres_backups
-          DB_HOST: localhost
-          DB_PORT: 5432
           DB_USER: bootcamp_admin
           DB_PASSWORD: secure_password
           DB_NAME: bootcamp_db
-        run: ./cron_job_runner.sh
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/postgres_backups"
+
+          # Find the running Postgres service container (the service uses the postgres:17-alpine image)
+          CONTAINER_ID=$(docker ps --filter "ancestor=postgres:17-alpine" --format "{{.ID}}" | head -n1)
+          if [ -z "$CONTAINER_ID" ]; then
+            echo "ERROR: Postgres container not found"
+            docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Names}}"
+            exit 1
+          fi
+          echo "Using Postgres container: $CONTAINER_ID"
+
+          # Wait for Postgres to be ready inside the container
+          until docker exec "$CONTAINER_ID" pg_isready -U "$DB_USER" > /dev/null 2>&1; do
+            echo "Waiting for Postgres inside container..."
+            sleep 2
+          done
+
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          OUTFILE="$GITHUB_WORKSPACE/postgres_backups/${DB_NAME}_${TIMESTAMP}.sql.gz"
+
+          # Run pg_dump inside the same container so versions match, pass password via env var
+          docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER_ID" pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$OUTFILE"
+
+          if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+            echo "ERROR: pg_dump failed inside container"
+            exit 1
+          fi
+
+          echo "Backup saved to $OUTFILE"
 
       - name: Upload backup
         uses: actions/upload-artifact@v4
