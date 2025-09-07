@@ -2,30 +2,34 @@
 # cron_job_runner.sh (CI/CD safe for GitHub Actions)
 
 # --- Configuration ---
-CONTAINER_NAME="${CONTAINER_NAME:-postgres_bootcamp}"   # GitHub Actions service name
 HOST_BACKUP_DIR="${HOST_BACKUP_DIR:-$PWD/postgres_backups}"
 DB_NAME="${DB_NAME:-bootcamp_db}"
 DB_USER="${DB_USER:-bootcamp_admin}"
+DB_PASSWORD="${DB_PASSWORD:-secret123}"
+DB_HOST="${DB_HOST:-postgres}"  # Service hostname in GitHub Actions
+DB_PORT="${DB_PORT:-5432}"
 
 # --- Ensure backup directory exists ---
 mkdir -p "$HOST_BACKUP_DIR"
 
 echo "Running backup job on $(date)..."
 
-# --- Wait until Postgres is ready ---
-until docker exec -u postgres "$CONTAINER_NAME" pg_isready -U "$DB_USER" > /dev/null 2>&1; do
+# --- Wait until Postgres is ready via TCP ---
+until PGPASSWORD="$DB_PASSWORD" pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" > /dev/null 2>&1; do
     echo "Waiting for Postgres to be ready..."
     sleep 2
 done
 
-# --- Run pg_dump inside container ---
+echo "Postgres is ready. Starting backup..."
+
+# --- Run pg_dump directly via TCP ---
 BACKUP_FILE="$HOST_BACKUP_DIR/${DB_NAME}_$(date +%Y%m%d_%H%M%S).sql"
-docker exec -u postgres "$CONTAINER_NAME" pg_dump -U "$DB_USER" "$DB_NAME" > "$BACKUP_FILE"
+PGPASSWORD="$DB_PASSWORD" pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB_NAME" > "$BACKUP_FILE"
 
 if [ $? -eq 0 ]; then
     echo "Backup saved to $BACKUP_FILE"
 else
-    echo "ERROR: Backup failed inside container."
+    echo "ERROR: Backup failed."
     exit 1
 fi
 

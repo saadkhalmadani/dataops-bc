@@ -5,7 +5,7 @@ on:
     branches: [ main ]
   workflow_dispatch:
   schedule:
-    - cron: '*/2 * * * *' # Every 2 minutes
+    - cron: '*/1 * * * *' # Every minute
 
 jobs:
   backup:
@@ -40,7 +40,9 @@ jobs:
           HOST_BACKUP_DIR: ${{ github.workspace }}/postgres_backups
           DB_NAME: bootcamp_db
           DB_USER: bootcamp_admin
-          CONTAINER_NAME: postgres
+          DB_PASSWORD: secret123
+          DB_HOST: postgres
+          DB_PORT: 5432
         run: ./cron_job_runner.sh
 
       # 4️⃣ Upload backups as artifact
