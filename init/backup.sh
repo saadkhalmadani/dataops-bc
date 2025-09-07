@@ -8,7 +8,7 @@ BASE_NAME="${BASE_NAME:-bootcamp_db_$TIMESTAMP}"
 DUMP_FILE="$BACKUP_DIR/$BASE_NAME.dump"
 SQL_FILE="$BACKUP_DIR/$BASE_NAME.sql"
 
-PGHOST="${PGHOST:-localhost}"
+PGHOST="${PGHOST:-db}"
 PGPORT="${PGPORT:-5434}"
 PGUSER="${PGUSER:-bootcamp_admin}"
 PGDATABASE="${PGDATABASE:-bootcamp_db}"
