@@ -10,7 +10,7 @@ if [ -f .env ]; then
   set +a
 fi
 
-HOST_BACKUP_DIR="${HOST_BACKUP_DIR:-$PWD/postgres_backups}"
+HOST_BACKUP_DIR="${HOST_BACKUP_DIR:-$PWD}"
 DB_NAME="${POSTGRES_DB:-${DB_NAME:-}}"
 DB_USER="${POSTGRES_USER:-${DB_USER:-postgres}}"
 DB_PASSWORD="${POSTGRES_PASSWORD:-${DB_PASSWORD:-}}"
