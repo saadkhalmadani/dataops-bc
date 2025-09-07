@@ -4,7 +4,6 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-  # Consider reducing frequency if not required; heavy schedules may be noisy/costly.
   schedule:
     - cron: '*/2 * * * *'
 
@@ -32,7 +31,7 @@ jobs:
       - name: Make script executable
         run: chmod +x ./cron_job_runner.sh
 
-      - name: Run backup (execute pg_dump inside Postgres container to avoid version mismatch)
+      - name: Run backup (pg_dump inside Postgres container to avoid client/server mismatch)
         env:
           HOST_BACKUP_DIR: ${{ github.workspace }}/postgres_backups
           DB_USER: bootcamp_admin
@@ -41,7 +40,7 @@ jobs:
         run: |
           mkdir -p "$GITHUB_WORKSPACE/postgres_backups"
 
-          # Find the running Postgres service container (the service uses the postgres:17-alpine image)
+          # Find the running Postgres service container (match the image used by the service)
           CONTAINER_ID=$(docker ps --filter "ancestor=postgres:17-alpine" --format "{{.ID}}" | head -n1)
           if [ -z "$CONTAINER_ID" ]; then
             echo "ERROR: Postgres container not found"
@@ -69,8 +68,16 @@ jobs:
 
           echo "Backup saved to $OUTFILE"
 
+      - name: 'Debug: list backups directory'
+        run: |
+          echo "Workspace: $GITHUB_WORKSPACE"
+          ls -la "$GITHUB_WORKSPACE" || true
+          ls -la "$GITHUB_WORKSPACE/postgres_backups" || echo "postgres_backups not found"
+          echo "Find .gz files:"
+          find "$GITHUB_WORKSPACE" -type f -name '*.gz' -maxdepth 4 -ls || true
+
       - name: Upload backup
         uses: actions/upload-artifact@v4
         with:
           name: postgres-backups
-          path: ${{ github.workspace }}/postgres_backups
+          path: ${{ github.workspace }}/postgres_backups/**
