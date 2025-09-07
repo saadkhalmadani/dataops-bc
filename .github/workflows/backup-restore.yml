@@ -18,8 +18,9 @@ jobs:
           POSTGRES_USER: bootcamp_admin
           POSTGRES_PASSWORD: secure_password
           POSTGRES_DB: bootcamp_db
+        # map host port 5434 -> container 5432 to match your .env POSTGRES_PORT=5434
         ports:
-          - 5432:5432
+          - 5434:5432
         options: >-
           --health-cmd "pg_isready -U bootcamp_admin -d bootcamp_db"
           --health-interval 10s
@@ -39,10 +40,28 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/postgres_backups"
           mkdir -p "$GITHUB_WORKSPACE/postgres_backups/logs"
 
+      - name: Load .env (if present) and export variables
+        run: |
+          set -euo pipefail
+          if [ -f .env ]; then
+            # export variables from .env; ignore comments and empty lines
+            set -o allexport
+            source .env
+            set +o allexport
+            echo ".env loaded"
+          else
+            echo ".env not found in repository root"
+          fi
+          # show non-secret values for debug
+          echo "POSTGRES_PORT=${POSTGRES_PORT:-<not set>}"
+          echo "POSTGRES_USER=${POSTGRES_USER:-<not set>}"
+          echo "POSTGRES_DB=${POSTGRES_DB:-<not set>}"
+
       - name: Find Postgres service container
         id: find_container
         run: |
           set -euo pipefail
+          # match the exact image used by the service
           CONTAINER_ID=$(docker ps --filter "ancestor=postgres:17-alpine" --format "{{.ID}}" | head -n1 || true)
           if [ -z "$CONTAINER_ID" ]; then
             echo "ERROR: Postgres service container not found"
@@ -55,112 +74,72 @@ jobs:
         run: |
           set -euo pipefail
           CONTAINER_ID="${{ steps.find_container.outputs.container_id }}"
-          echo "Using container $CONTAINER_ID"
-          until docker exec "$CONTAINER_ID" pg_isready -U bootcamp_admin -d bootcamp_db > /dev/null 2>&1; do
-            echo "Waiting for Postgres inside container..."
+          # Use values from .env if present; fallback to the known defaults
+          PGUSER="${POSTGRES_USER:-bootcamp_admin}"
+          PGPASSWORD="${POSTGRES_PASSWORD:-secure_password}"
+          PGDATABASE="${POSTGRES_DB:-bootcamp_db}"
+          echo "Waiting for Postgres inside container $CONTAINER_ID..."
+          until docker exec -e PGPASSWORD="$PGPASSWORD" "$CONTAINER_ID" pg_isready -U "$PGUSER" -d "$PGDATABASE" > /dev/null 2>&1; do
             sleep 2
           done
-          echo "Postgres is ready"
+          echo "Postgres is ready in container $CONTAINER_ID"
 
-      - name: Diagnostics (list DBs, table counts) and run verbose pg_dump
-        env:
-          DB_USER: bootcamp_admin
-          DB_PASSWORD: secure_password
-          DB_NAME: bootcamp_db
+      - name: Run pg_dump inside Postgres container and write gzipped SQL
+        id: run_dump
         run: |
           set -euo pipefail
           CONTAINER_ID="${{ steps.find_container.outputs.container_id }}"
+          # Use values loaded from .env if available, otherwise use the defaults used for the service
+          DB_USER="${POSTGRES_USER:-bootcamp_admin}"
+          DB_PASSWORD="${POSTGRES_PASSWORD:-secure_password}"
+          DB_NAME="${POSTGRES_DB:-bootcamp_db}"
           OUT_DIR="$GITHUB_WORKSPACE/postgres_backups"
-          LOG_DIR="$OUT_DIR/logs"
           TIMESTAMP=$(date -u +%Y%m%d_%H%M%S)
-          DUMPFILE="$OUT_DIR/${DB_NAME}_${TIMESTAMP}.sql.gz"
-          DUMPLOG="$LOG_DIR/pg_dump_${TIMESTAMP}.log"
-          DIAGLOG="$LOG_DIR/diag_${TIMESTAMP}.log"
-
-          echo "=== Diagnostics: databases and sizes ===" > "$DIAGLOG"
-          # List databases
-          docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER_ID" psql -U "$DB_USER" -d postgres -c "\l+" >> "$DIAGLOG" 2>&1 || true
-
-          echo "=== Table count in target DB ===" >> "$DIAGLOG"
-          # Count tables in public schema (change if you use other schemas)
-          docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER_ID" psql -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT count(*) FROM information_schema.tables WHERE table_catalog = current_database() AND table_schema NOT IN ('pg_catalog','information_schema');" >> "$DIAGLOG" 2>&1 || true
-
-          echo "Diagnostics written to $DIAGLOG"
-          echo "Running pg_dump (verbose) inside container; verbose output will go to $DUMPLOG"
-
-          # Run pg_dump inside the container and capture verbose output
-          # Use a pipeline but capture pg_dump exit status via PIPESTATUS-like behavior
-          docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER_ID" bash -lc "pg_dump -v -U '$DB_USER' '$DB_NAME'" > "$OUT_DIR/temp_dump.sql" 2> "$DUMPLOG" || true
-          PGDUMP_EXIT=$?
+          OUTFILE="$OUT_DIR/${DB_NAME}_${TIMESTAMP}.sql.gz"
+          DUMPLOG="$OUT_DIR/logs/pg_dump_${TIMESTAMP}.log"
+          echo "Running pg_dump inside container $CONTAINER_ID -> $OUTFILE"
+          # run pg_dump inside the service container and stream output to runner workspace
+          docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER_ID" bash -lc "pg_dump -U '$DB_USER' -d '$DB_NAME'" > "$OUT_DIR/temp_dump.sql" 2> "$DUMPLOG" || true
           if [ -s "$OUT_DIR/temp_dump.sql" ]; then
-            gzip -c "$OUT_DIR/temp_dump.sql" > "$DUMPFILE"
+            gzip -c9 "$OUT_DIR/temp_dump.sql" > "$OUTFILE"
             rm -f "$OUT_DIR/temp_dump.sql"
+            echo "dump_file=$OUTFILE" >> "$GITHUB_OUTPUT"
+            echo "dump_log=$DUMPLOG" >> "$GITHUB_OUTPUT"
+            echo "Saved backup to $OUTFILE"
           else
-            echo "Warning: pg_dump produced no SQL output" >> "$DUMPLOG"
+            echo "Warning: pg_dump produced no SQL output; check $DUMPLOG"
             rm -f "$OUT_DIR/temp_dump.sql" || true
+            echo "dump_file=" >> "$GITHUB_OUTPUT"
+            echo "dump_log=$DUMPLOG" >> "$GITHUB_OUTPUT"
+            exit 1
           fi
 
-          if [ "$PGDUMP_EXIT" -ne 0 ]; then
-            echo "pg_dump exit code: $PGDUMP_EXIT" >> "$DUMPLOG"
-            echo "ERROR: pg_dump failed (see $DUMPLOG)"
-            # keep logs and proceed to uploading artifact for inspection, but fail the step
-            cat "$DUMPLOG" || true
-            exit $PGDUMP_EXIT
-          fi
-
-          echo "Backup saved to $DUMPFILE"
-          echo "dump_file=$DUMPFILE" >> "$GITHUB_OUTPUT"
-          echo "dump_log=$DUMPLOG" >> "$GITHUB_OUTPUT"
-          echo "diag_log=$DIAGLOG" >> "$GITHUB_OUTPUT"
-
-      - name: Collect db size and table count for CSV
-        id: collect_info
-        env:
-          DB_USER: bootcamp_admin
-          DB_PASSWORD: secure_password
-          DB_NAME: bootcamp_db
+      - name: 'Debug: show backups directory'
         run: |
-          set -euo pipefail
-          CONTAINER_ID="${{ steps.find_container.outputs.container_id }}"
-          # db size in bytes
-          db_size=$(docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER_ID" psql -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT COALESCE(pg_database_size(current_database()),0);" | tr -d '[:space:]' || echo "")
-          # table count
-          table_count=$(docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER_ID" psql -U "$DB_USER" -d "$DB_NAME" -t -c "SELECT count(*) FROM information_schema.tables WHERE table_catalog = current_database() AND table_schema NOT IN ('pg_catalog','information_schema');" | tr -d '[:space:]' || echo "")
-          echo "db_size_bytes=${db_size:-}" >> "$GITHUB_OUTPUT"
-          echo "table_count=${table_count:-}" >> "$GITHUB_OUTPUT"
-          echo "Collected db_size_bytes=${db_size:-} table_count=${table_count:-}"
+          echo "Workspace: $GITHUB_WORKSPACE"
+          ls -la "$GITHUB_WORKSPACE" || true
+          echo "Backups dir contents:"
+          ls -la "$GITHUB_WORKSPACE/postgres_backups" || echo "postgres_backups not found"
+          echo "Find .gz files:"
+          find "$GITHUB_WORKSPACE/postgres_backups" -maxdepth 1 -type f -name '*.gz' -ls || true
 
-      - name: Generate backups CSV (include db size and table count)
+      - name: Generate backups CSV
         run: |
           set -euo pipefail
           OUT_DIR="$GITHUB_WORKSPACE/postgres_backups"
+          mkdir -p "$OUT_DIR"
           OUT="$OUT_DIR/backups.csv"
-          dumpfile="${{ steps.find_container.outputs.dump_file || '' }}"
-          # If dump path wasn't set via output, find newest gz
-          if [ -z "${{ steps.find_container.outputs.dump_file || '' }}" ]; then
-            if compgen -G "$OUT_DIR/*.gz" > /dev/null; then
-              dumpfile=$(ls -1t "$OUT_DIR"/*.gz | head -n1)
-            else
-              dumpfile=""
-            fi
-          fi
-
-          filename=$(basename "$dumpfile" 2>/dev/null || echo "")
-          timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          size_bytes=0
-          if [ -n "$dumpfile" ] && [ -f "$dumpfile" ]; then
-            size_bytes=$(stat -c %s "$dumpfile" || echo 0)
-          fi
-
-          db_size="${{ steps.collect_info.outputs.db_size_bytes || '' }}"
-          table_count="${{ steps.collect_info.outputs.table_count || '' }}"
-          dump_log="${{ steps.find_container.outputs.dump_log || '' }}"
-          diag_log="${{ steps.find_container.outputs.diag_log || '' }}"
-
-          echo "filename,path,timestamp,size_bytes,db_size_bytes,table_count,dump_log,diag_log" > "$OUT"
-          echo "${filename},postgres_backups,${timestamp},${size_bytes:-0},${db_size:-},${table_count:-},${dump_log:-},${diag_log:-}" >> "$OUT"
-
-          echo "Generated CSV: $OUT"
+          echo "filename,path,timestamp,size_bytes" > "$OUT"
+          shopt -s nullglob || true
+          for f in "$OUT_DIR"/*.gz; do
+            [ -e "$f" ] || continue
+            fn=$(basename "$f")
+            mtime=$(date -u -d "@$(stat -c %Y "$f")" +"%Y-%m-%dT%H:%M:%SZ")
+            size=$(stat -c %s "$f")
+            safe_fn="${fn//,/\\,}"
+            echo "${safe_fn},postgres_backups,${mtime},${size}" >> "$OUT"
+          done
+          echo "Generated $OUT"
           ls -la "$OUT_DIR" || true
           sed -n '1,200p' "$OUT" || true
 
