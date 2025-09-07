@@ -1,39 +1,36 @@
-#!/bin/bash
-# backup.sh (Modified to create two formats)
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Exit immediately if a command fails
-set -e
-
-# --- Configuration ---
-BACKUP_DIR="/var/lib/postgresql/data/backups"
-# Create a common base name with a timestamp
-BASE_NAME="bootcamp_db_$(date +%Y-%m-%d_%H-%M-%S)"
+DEFAULT_BACKUP_DIR="./backups"
+BACKUP_DIR="${BACKUP_DIR:-$DEFAULT_BACKUP_DIR}"
+TIMESTAMP="$(date +%Y-%m-%d_%H-%M-%S)"
+BASE_NAME="${BASE_NAME:-bootcamp_db_$TIMESTAMP}"
 DUMP_FILE="$BACKUP_DIR/$BASE_NAME.dump"
 SQL_FILE="$BACKUP_DIR/$BASE_NAME.sql"
 
-# --- Script Logic ---
-# Create the backup directory if it doesn't exist
+PGHOST="${PGHOST:-localhost}"
+PGPORT="${PGPORT:-5432}"
+PGUSER="${PGUSER:-backup_user}"
+PGDATABASE="${PGDATABASE:-bootcamp_db}"
+
 mkdir -p "$BACKUP_DIR"
+trap 'echo "❌ Backup failed at $(date)" >&2' ERR
 
-echo "Starting backup process..."
+echo "🚀 Starting backup for database: $PGDATABASE"
 
-# Set the password for non-interactive login
-export PGPASSWORD='another_secure_password'
+if [ -z "${PGPASSWORD:-}" ]; then
+  echo "ERROR: PGPASSWORD is not set. Use repository/Actions secrets." >&2
+  exit 1
+fi
 
-# 1. Create the compressed .dump file (custom format)
-echo "Creating .dump file..."
-pg_dump -U backup_user -d bootcamp_db -F c -f "$DUMP_FILE"
+echo "📦 Creating compressed dump: $DUMP_FILE"
+PGPASSWORD="$PGPASSWORD" pg_dump -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -F c -f "$DUMP_FILE"
 
-# 2. Create the plain text .sql file
-echo "Creating .sql file..."
-pg_dump -U backup_user -d bootcamp_db -f "$SQL_FILE"
+echo "📜 Creating plain SQL: $SQL_FILE"
+PGPASSWORD="$PGPASSWORD" pg_dump -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" -f "$SQL_FILE"
 
-# Unset the password variable for security
-unset PGPASSWORD
+sha256sum "$DUMP_FILE" "$SQL_FILE" > "$BACKUP_DIR/$BASE_NAME.sha256"
 
-# IMPORTANT: Print the full path of EACH created file, one per line.
-# The runner script will read these lines to copy the files out.
 echo "$DUMP_FILE"
 echo "$SQL_FILE"
-
-echo "Both backup files created inside container."
+echo "✅ Backup completed successfully at $(date)"
