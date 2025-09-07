@@ -2,7 +2,7 @@ name: Postgres Backup
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   schedule:
     - cron: '*/2 * * * *'
 
