@@ -3,7 +3,6 @@ name: Postgres Backup
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:
   schedule:
     - cron: '*/2 * * * *'
 
