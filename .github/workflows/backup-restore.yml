@@ -1,150 +1,19 @@
-name: Postgres Backup
+
+# Backup & Restore Automation Workflow
+name: Backup & Restore
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
   schedule:
-    - cron: '*/2 * * * *'
-
+    - cron: '*/2 * * * *' 
 jobs:
   backup:
     runs-on: ubuntu-latest
-
-    services:
-      db:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: bootcamp_admin
-          POSTGRES_PASSWORD: secure_password
-          POSTGRES_DB: bootcamp_db
-        # map host port 5434 -> container 5432 to match your .env POSTGRES_PORT=5434
-        ports:
-          - 5434:5432
-        options: >-
-          --health-cmd "pg_isready -U bootcamp_admin -d bootcamp_db"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-          --health-start-period 60s
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
-      - name: Prepare workspace
-        run: |
-          set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/postgres_backups"
-          mkdir -p "$GITHUB_WORKSPACE/postgres_backups/logs"
-
-      - name: Load .env (if present) and export variables
-        run: |
-          set -euo pipefail
-          if [ -f .env ]; then
-            # export variables from .env; ignore comments and empty lines
-            set -o allexport
-            source .env
-            set +o allexport
-            echo ".env loaded"
-          else
-            echo ".env not found in repository root"
-          fi
-          # show non-secret values for debug
-          echo "POSTGRES_PORT=${POSTGRES_PORT:-<not set>}"
-          echo "POSTGRES_USER=${POSTGRES_USER:-<not set>}"
-          echo "POSTGRES_DB=${POSTGRES_DB:-<not set>}"
-
-      - name: Find Postgres service container
-        id: find_container
-        run: |
-          set -euo pipefail
-          # match the exact image used by the service
-          CONTAINER_ID=$(docker ps --filter "ancestor=postgres:17-alpine" --format "{{.ID}}" | head -n1 || true)
-          if [ -z "$CONTAINER_ID" ]; then
-            echo "ERROR: Postgres service container not found"
-            docker ps --format "table {{.ID}}\t{{.Image}}\t{{.Names}}"
-            exit 1
-          fi
-          echo "container_id=$CONTAINER_ID" >> "$GITHUB_OUTPUT"
-
-      - name: Wait for Postgres ready inside container
-        run: |
-          set -euo pipefail
-          CONTAINER_ID="${{ steps.find_container.outputs.container_id }}"
-          # Use values from .env if present; fallback to the known defaults
-          PGUSER="${POSTGRES_USER:-bootcamp_admin}"
-          PGPASSWORD="${POSTGRES_PASSWORD:-secure_password}"
-          PGDATABASE="${POSTGRES_DB:-bootcamp_db}"
-          echo "Waiting for Postgres inside container $CONTAINER_ID..."
-          until docker exec -e PGPASSWORD="$PGPASSWORD" "$CONTAINER_ID" pg_isready -U "$PGUSER" -d "$PGDATABASE" > /dev/null 2>&1; do
-            sleep 2
-          done
-          echo "Postgres is ready in container $CONTAINER_ID"
-
-      - name: Run pg_dump inside Postgres container and write gzipped SQL
-        id: run_dump
-        run: |
-          set -euo pipefail
-          CONTAINER_ID="${{ steps.find_container.outputs.container_id }}"
-          # Use values loaded from .env if available, otherwise use the defaults used for the service
-          DB_USER="${POSTGRES_USER:-bootcamp_admin}"
-          DB_PASSWORD="${POSTGRES_PASSWORD:-secure_password}"
-          DB_NAME="${POSTGRES_DB:-bootcamp_db}"
-          OUT_DIR="$GITHUB_WORKSPACE/postgres_backups"
-          TIMESTAMP=$(date -u +%Y%m%d_%H%M%S)
-          OUTFILE="$OUT_DIR/${DB_NAME}_${TIMESTAMP}.sql.gz"
-          DUMPLOG="$OUT_DIR/logs/pg_dump_${TIMESTAMP}.log"
-          echo "Running pg_dump inside container $CONTAINER_ID -> $OUTFILE"
-          # run pg_dump inside the service container and stream output to runner workspace
-          docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER_ID" bash -lc "pg_dump -U '$DB_USER' -d '$DB_NAME'" > "$OUT_DIR/temp_dump.sql" 2> "$DUMPLOG" || true
-          if [ -s "$OUT_DIR/temp_dump.sql" ]; then
-            gzip -c9 "$OUT_DIR/temp_dump.sql" > "$OUTFILE"
-            rm -f "$OUT_DIR/temp_dump.sql"
-            echo "dump_file=$OUTFILE" >> "$GITHUB_OUTPUT"
-            echo "dump_log=$DUMPLOG" >> "$GITHUB_OUTPUT"
-            echo "Saved backup to $OUTFILE"
-          else
-            echo "Warning: pg_dump produced no SQL output; check $DUMPLOG"
-            rm -f "$OUT_DIR/temp_dump.sql" || true
-            echo "dump_file=" >> "$GITHUB_OUTPUT"
-            echo "dump_log=$DUMPLOG" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-
-      - name: 'Debug: show backups directory'
-        run: |
-          echo "Workspace: $GITHUB_WORKSPACE"
-          ls -la "$GITHUB_WORKSPACE" || true
-          echo "Backups dir contents:"
-          ls -la "$GITHUB_WORKSPACE/postgres_backups" || echo "postgres_backups not found"
-          echo "Find .gz files:"
-          find "$GITHUB_WORKSPACE/postgres_backups" -maxdepth 1 -type f -name '*.gz' -ls || true
-
-      - name: Generate backups CSV
-        run: |
-          set -euo pipefail
-          OUT_DIR="$GITHUB_WORKSPACE/postgres_backups"
-          mkdir -p "$OUT_DIR"
-          OUT="$OUT_DIR/backups.csv"
-          echo "filename,path,timestamp,size_bytes" > "$OUT"
-          shopt -s nullglob || true
-          for f in "$OUT_DIR"/*.gz; do
-            [ -e "$f" ] || continue
-            fn=$(basename "$f")
-            mtime=$(date -u -d "@$(stat -c %Y "$f")" +"%Y-%m-%dT%H:%M:%SZ")
-            size=$(stat -c %s "$f")
-            safe_fn="${fn//,/\\,}"
-            echo "${safe_fn},postgres_backups,${mtime},${size}" >> "$OUT"
-          done
-          echo "Generated $OUT"
-          ls -la "$OUT_DIR" || true
-          sed -n '1,200p' "$OUT" || true
-
-      - name: Upload backup artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: postgres-backups
-          path: ${{ github.workspace }}/postgres_backups/**
+      - name: Backup database
+        run: ./home/saadkh/dataops-bc/init/backup.sh
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BACKUP_PATH: backups/
