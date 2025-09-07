@@ -3,6 +3,7 @@ name: Postgres Backup
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
   schedule:
     - cron: '*/2 * * * *'
 
@@ -28,12 +29,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Make script executable
+      - name: Make backup script executable
         run: chmod +x ./init/backup.sh
 
       - name: Run backup (uses ./init/backup.sh)
-        # Service container is reachable at localhost:5432 from the runner.
+        # The Postgres service is reachable from the runner at localhost:5432.
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/postgres_backups"
+          echo "Running ./init/backup.sh (HOST_BACKUP_DIR=$HOST_BACKUP_DIR DB_HOST=$DB_HOST DB_PORT=$DB_PORT DB_NAME=$DB_NAME)"
+          ./init/backup.sh
         env:
           HOST_BACKUP_DIR: ${{ github.workspace }}/postgres_backups
           DB_HOST: localhost
@@ -41,11 +49,6 @@ jobs:
           DB_USER: bootcamp_admin
           DB_PASSWORD: secure_password
           DB_NAME: bootcamp_db
-        run: |
-          set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/postgres_backups"
-          echo "Running ./init/backup.sh with HOST_BACKUP_DIR=$HOST_BACKUP_DIR DB_HOST=$DB_HOST DB_PORT=$DB_PORT DB_NAME=$DB_NAME"
-          ./init/backup.sh
 
       - name: "Debug: list backups directory"
         run: |
@@ -56,7 +59,7 @@ jobs:
           echo "Find .gz files:"
           find "$GITHUB_WORKSPACE/postgres_backups" -maxdepth 1 -type f -name '*.gz' -ls || true
 
-      - name: Show where backup.sh saved the file
+      - name: Show newest backup path
         id: show_saved
         run: |
           set -euo pipefail
@@ -81,6 +84,7 @@ jobs:
           for f in "$OUT_DIR"/*.gz; do
             [ -e "$f" ] || continue
             fn=$(basename "$f")
+            # modification time in UTC, format YYYY-MM-DDTHH:MM:SSZ
             mtime=$(date -u -d "@$(stat -c %Y "$f")" +"%Y-%m-%dT%H:%M:%SZ")
             size=$(stat -c %s "$f")
             safe_fn="${fn//,/\\,}"
