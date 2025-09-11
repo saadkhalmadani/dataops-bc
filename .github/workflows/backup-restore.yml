@@ -12,14 +12,11 @@ on:
           - 'true'
           - 'false'
 
-  schedule:
-    - cron: '* * * */1 *'   # Every 1 month
-
 jobs:
 
   backup:
-    runs-on: ubuntu-latest
 
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:15
@@ -53,12 +50,16 @@ jobs:
           path: ./backups/
 
   restore:
+
     runs-on: ubuntu-latest
+
     needs: backup
-    if: github.event.inputs.restore == 'yes'
+
+    if: github.event.inputs.restore == 'true'
 
     services:
       postgres:
+        
         image: postgres:15
         env:
           POSTGRES_USER: bootcamp_admin
