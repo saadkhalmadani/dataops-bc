@@ -9,9 +9,9 @@ on:
         default: 'false'
         type: choice
         options:
-          - 'true'
-          - 'false'
-        
+          - 'yes'
+          - 'no'
+
   schedule:
     - cron: '* * * */1 *'   # Every 1 month
 
@@ -55,7 +55,7 @@ jobs:
   restore:
     runs-on: ubuntu-latest
     needs: backup
-    if: github.event.inputs.restore == 'true'
+    if: github.event.inputs.restore == 'yes'
 
     services:
       postgres:
