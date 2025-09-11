@@ -50,7 +50,9 @@ jobs:
           path: ./backups/
 
   restore:
-    runs-on: ubuntu-latest
+
+    runs-on: ubuntu-24-04
+
     needs: backup
     if: github.event.inputs.restore == 'true'
 
@@ -70,6 +72,7 @@ jobs:
           --health-retries=5
 
     steps:
+
       - uses: actions/checkout@v4
 
       - name: Download latest backup
