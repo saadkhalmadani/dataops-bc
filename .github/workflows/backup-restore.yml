@@ -15,7 +15,7 @@ on:
 jobs:
 
   backup:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     services:
       postgres:
@@ -50,8 +50,7 @@ jobs:
           path: ./backups/
 
   restore:
-
-    runs-on: ubuntu-24-04
+    runs-on: ubuntu-24.04
 
     needs: backup
     if: github.event.inputs.restore == 'true'
