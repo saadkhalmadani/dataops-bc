@@ -7,6 +7,10 @@ on:
         description: 'Run restore job?'
         required: false
         default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
         
   schedule:
     - cron: '* * * */1 *'   # Every 1 month
