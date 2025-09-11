@@ -9,8 +9,8 @@ on:
         default: 'false'
         type: choice
         options:
-          - 'yes'
-          - 'no'
+          - 'true'
+          - 'false'
 
   schedule:
     - cron: '* * * */1 *'   # Every 1 month
