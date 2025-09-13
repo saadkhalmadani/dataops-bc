@@ -15,19 +15,26 @@ on:
 jobs:
 
   backup:
-    runs-on: ubuntu-24.04
 
+    runs-on: ubuntu-24.04
+    env:
+      DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
+      BACKUP_PATH: ./backups/
+      POSTGRES_USER: bootcamp_admin
+      POSTGRES_PASSWORD: secure_password
+      POSTGRES_DB: bootcamp_db
+      POSTGRES_PORT: 5434
     services:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: bootcamp_admin
-          POSTGRES_PASSWORD: secure_password
-          POSTGRES_DB: bootcamp_db
+          POSTGRES_USER: ${POSTGRES_USER }
+          POSTGRES_PASSWORD: ${POSTGRES_PASSWORD }
+          POSTGRES_DB: ${POSTGRES_DB }
         ports:
-          - 5434:5432
+          - ${POSTGRES_PORT}:5432
         options: >-
-          --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
+          --health-cmd="pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -35,15 +42,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-
+      - name: save variables to env
+        run: |
+          echo "DATABASE_URL=postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db" >> $GITHUB_ENV
+          echo "BACKUP_PATH=./backups/" >> $GITHUB_ENV
       - name: Run backup script
         run: |
           chmod +x ./init/backup.sh
           ./init/backup.sh
-        env:
-          DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
-          BACKUP_PATH: ./backups/
-
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4
         with:
@@ -51,22 +57,29 @@ jobs:
           path: ./backups/
 
   restore:
+
     runs-on: ubuntu-24.04
 
     needs: backup
     if: github.event.inputs.restore == 'true'
-
+    env:
+      DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
+      BACKUP_PATH: ./backups/
+      POSTGRES_USER: bootcamp_admin
+      POSTGRES_PASSWORD: secure_password
+      POSTGRES_DB: bootcamp_db
+      POSTGRES_PORT: 5434
     services:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: bootcamp_admin
-          POSTGRES_PASSWORD: secure_password
-          POSTGRES_DB: bootcamp_db
+          POSTGRES_USER: ${POSTGRES_USER}
+          POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+          POSTGRES_DB: ${POSTGRES_DB}
         ports:
-          - 5434:5432
+          - ${POSTGRES_PORT}:5432
         options: >-
-          --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
+          --health-cmd="pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
