@@ -21,13 +21,13 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: bootcamp_admin
+          POSTGRES_PASSWORD: secure_password
+          POSTGRES_DB: bootcamp_db
         ports:
           - 5434:5432
         options: >-
-          --health-cmd="pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+          --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -41,7 +41,7 @@ jobs:
           chmod +x ./init/backup.sh
           ./init/backup.sh
         env:
-          DATABASE_URL: postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5434/$POSTGRES_DB
+          DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
           BACKUP_PATH: ./backups/
 
       - name: Upload backup artifact
@@ -52,6 +52,7 @@ jobs:
 
   restore:
     runs-on: ubuntu-24.04
+
     needs: backup
     if: github.event.inputs.restore == 'true'
 
@@ -59,18 +60,24 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_USER: bootcamp_admin
+          POSTGRES_PASSWORD: secure_password
+          POSTGRES_DB: bootcamp_db
         ports:
           - 5434:5432
         options: >-
-          --health-cmd="pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+          --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     steps:
+      - name: Download latest backup
+        uses: actions/download-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: ./backups/
+
       - name: Checkout repository
         uses: actions/checkout@v5
 
@@ -95,5 +102,5 @@ jobs:
           chmod +x ./init/restore.sh
           ./init/restore.sh
         env:
-          DATABASE_URL: postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5434/$POSTGRES_DB
+          DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
           BACKUP_PATH: ./backups/
