@@ -21,29 +21,28 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+          POSTGRES_USER: bootcamp_admin
+          POSTGRES_PASSWORD: secure_password
+          POSTGRES_DB: bootcamp_db
         ports:
-          - '$POSTGRS_PORT:5432'
-        # options: >-
-        #   --health-cmd="pg_isready -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_DB }}"
-        #   --health-interval=10s
-        #   --health-timeout=5s
-        #   --health-retries=5
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5.0.0
+        uses: actions/checkout@v5
 
       - name: Run backup script
         run: |
           chmod +x ./init/backup.sh
           ./init/backup.sh
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          BACKUP_PATH: ${{ secrets.BACKUP_PATH }}
+          DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
+          BACKUP_PATH: ./backups/
 
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4
@@ -53,6 +52,7 @@ jobs:
 
   restore:
     runs-on: ubuntu-24.04
+
     needs: backup
     if: github.event.inputs.restore == 'true'
 
@@ -60,21 +60,26 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-          POSTGRS_PORT: ${{secrets.POSTGRS_PORT}}
+          POSTGRES_USER: bootcamp_admin
+          POSTGRES_PASSWORD: secure_password
+          POSTGRES_DB: bootcamp_db
         ports:
-          - '$POSTGRS_PORT:5432'
-        # options: >-
-        #   --health-cmd="pg_isready -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_DB }}"
-        #   --health-interval=10s
-        #   --health-timeout=5s
-        #   --health-retries=5
+          - 5434:5432
+        options: >-
+          --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
+      - name: Download latest backup
+        uses: actions/download-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: ./backups/
+
       - name: Checkout repository
-        uses: actions/checkout@v5.0.0
+        uses: actions/checkout@v5
 
       - name: Download latest backup
         uses: actions/download-artifact@v4
@@ -97,5 +102,5 @@ jobs:
           chmod +x ./init/restore.sh
           ./init/restore.sh
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          BACKUP_PATH: ${{ secrets.BACKUP_PATH }}
+          DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
+          BACKUP_PATH: ./backups/
