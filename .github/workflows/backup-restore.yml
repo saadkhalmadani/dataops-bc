@@ -15,24 +15,26 @@ on:
 jobs:
 
   backup:
-    runs-on: ubuntu-24.04
 
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: bootcamp_admin
-          POSTGRES_PASSWORD: secure_password
-          POSTGRES_DB: bootcamp_db
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
         ports:
-          - 5434:5432
+          - $POSTGRES_PORT:5432
         options: >-
-          --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
+          --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v5.0.0
 
@@ -40,9 +42,10 @@ jobs:
         run: |
           chmod +x ./init/backup.sh
           ./init/backup.sh
+
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          BACKUP_PATH: ${{ secrets.BACKUP_PATH }}
+          DATABASE_URL: postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:$POSTGRES_PORT/$POSTGRES_DB
+          BACKUP_PATH: ./backups/
 
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4
@@ -59,18 +62,20 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: bootcamp_admin
-          POSTGRES_PASSWORD: secure_password
-          POSTGRES_DB: bootcamp_db
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
         ports:
-          - 5434:5432
+          - $POSTGRES_PORT:5432
         options: >-
-          --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
+          --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v5.0.0
 
@@ -95,5 +100,5 @@ jobs:
           chmod +x ./init/restore.sh
           ./init/restore.sh
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          BACKUP_PATH: ${{ secrets.BACKUP_PATH }}
+          DATABASE_URL: postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:$POSTGRES_PORT/$POSTGRES_DB
+          BACKUP_PATH: ./backups/
