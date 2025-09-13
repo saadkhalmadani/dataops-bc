@@ -15,26 +15,24 @@ on:
 jobs:
 
   backup:
-
     runs-on: ubuntu-24.04
 
     services:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: ${{secrets.POSTGRES_USER}}
-          POSTGRES_PASSWORD: ${{secrets.POSTGRES_PASSWORD}}
-          POSTGRES_DB: ${{secrets.POSTGRES_DB}}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
         ports:
           - 5434:5432
         options: >-
-          --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
+          --health-cmd="pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v5
 
@@ -54,7 +52,6 @@ jobs:
 
   restore:
     runs-on: ubuntu-24.04
-
     needs: backup
     if: github.event.inputs.restore == 'true'
 
@@ -62,24 +59,18 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: ${{secrets.POSTGRES_USER}}
-          POSTGRES_PASSWORD: ${{secrets.POSTGRES_PASSWORD}}
-          POSTGRES_DB: ${{secrets.POSTGRES_DB}}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
         ports:
           - 5434:5432
         options: >-
-          --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
+          --health-cmd="pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     steps:
-      - name: Download latest backup
-        uses: actions/download-artifact@v4
-        with:
-          name: db-backup-${{ github.run_id }}
-          path: ./backups/
-
       - name: Checkout repository
         uses: actions/checkout@v5
 
