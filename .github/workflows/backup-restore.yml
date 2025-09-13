@@ -33,7 +33,8 @@ jobs:
           --health-retries=5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
       - name: Run backup script
         run: |
@@ -71,8 +72,13 @@ jobs:
           --health-retries=5
 
     steps:
+      - name: Download latest backup
+        uses: actions/download-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: ./backups/
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Download latest backup
         uses: actions/download-artifact@v4
