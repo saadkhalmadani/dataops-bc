@@ -41,7 +41,7 @@ jobs:
           chmod +x ./init/backup.sh
           ./init/backup.sh
         env:
-          DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
+          DATABASE_URL: ${{secrets.DATABASE_URL}}
           BACKUP_PATH: ./backups/
 
       - name: Upload backup artifact
@@ -64,7 +64,7 @@ jobs:
           POSTGRES_PASSWORD: secure_password
           POSTGRES_DB: bootcamp_db
         ports:
-          - 5434:5432
+          - 5432:5432
         options: >-
           --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
           --health-interval=10s
@@ -102,5 +102,5 @@ jobs:
           chmod +x ./init/restore.sh
           ./init/restore.sh
         env:
-          DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
+          DATABASE_URL: ${{secrets.DATABASE_URL}}
           BACKUP_PATH: ./backups/
