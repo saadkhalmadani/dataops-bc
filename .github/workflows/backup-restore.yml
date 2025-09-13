@@ -15,19 +15,21 @@ on:
 jobs:
 
   backup:
+    
     runs-on: ubuntu-24.04
 
     services:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: bootcamp_admin
-          POSTGRES_PASSWORD: secure_password
-          POSTGRES_DB: bootcamp_db
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
         ports:
-          - 5432:5432
+          - $POSTGRES_PORT:5432
         options: >-
-          --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
+          --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -36,12 +38,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Wait for Postgres to be ready
+        run: |
+          for i in {1..10}; do
+            if pg_isready -h localhost -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB; then
+              echo "✅ Postgres is ready!"
+              break
+            fi
+            echo "⏳ Waiting for Postgres..."
+            sleep 5
+          done
+
       - name: Run backup script
         run: |
           chmod +x ./init/backup.sh
           ./init/backup.sh
         env:
-          DATABASE_URL: ${{secrets.DATABASE_URL}}
+          DATABASE_URL: postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:$POSTGRES_PORT/$POSTGRES_DB
           BACKUP_PATH: ./backups/
 
       - name: Upload backup artifact
@@ -51,6 +64,7 @@ jobs:
           path: ./backups/
 
   restore:
+
     runs-on: ubuntu-24.04
 
     needs: backup
@@ -60,24 +74,19 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: bootcamp_admin
-          POSTGRES_PASSWORD: secure_password
-          POSTGRES_DB: bootcamp_db
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
         ports:
-          - 5432:5432
+          - $POSTGRES_PORT:5432
         options: >-
-          --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
+          --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     steps:
-      - name: Download latest backup
-        uses: actions/download-artifact@v4
-        with:
-          name: db-backup-${{ github.run_id }}
-          path: ./backups/
-
       - name: Checkout repository
         uses: actions/checkout@v5
 
@@ -86,6 +95,17 @@ jobs:
         with:
           name: db-backup-${{ github.run_id }}
           path: ./backups/
+
+      - name: Wait for Postgres to be ready
+        run: |
+          for i in {1..10}; do
+            if pg_isready -h localhost -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB; then
+              echo "✅ Postgres is ready!"
+              break
+            fi
+            echo "⏳ Waiting for Postgres..."
+            sleep 5
+          done
 
       - name: Verify latest backup checksum
         run: |
@@ -102,5 +122,5 @@ jobs:
           chmod +x ./init/restore.sh
           ./init/restore.sh
         env:
-          DATABASE_URL: ${{secrets.DATABASE_URL}}
+          DATABASE_URL: postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:$POSTGRES_PORT/$POSTGRES_DB
           BACKUP_PATH: ./backups/
