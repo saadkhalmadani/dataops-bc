@@ -28,7 +28,7 @@ jobs:
         ports:
           - $POSTGRES_PORT:5432
         options: >-
-          --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
+          --health-cmd="pg_isready -U postgres -d postgres"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -69,7 +69,7 @@ jobs:
         ports:
           - $POSTGRES_PORT:5432
         options: >-
-          --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
+          --health-cmd="pg_isready -U postgres -d postgres"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
