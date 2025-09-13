@@ -12,30 +12,22 @@ on:
           - 'true'
           - 'false'
 
-env:
-  BACKUP_PATH: ./backups/
-  DB_USER: bootcamp_admin
-  DB_PASSWORD: secure_password
-  DB_NAME: bootcamp_db
-  DB_PORT: 5434
-  
 jobs:
 
   backup:
 
     runs-on: ubuntu-24.04
-
     services:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: $DB_USER
-          POSTGRES_PASSWORD: DB_PASSWORD
-          POSTGRES_DB: $DB_NAME
+          POSTGRES_USER: bootcamp_admin
+          POSTGRES_PASSWORD: secure_password
+          POSTGRES_DB: bootcamp_db
         ports:
-          - $DB_PORT:5432
+          - 5434:5432
         options: >-
-          --health-cmd="pg_isready -U $DB_USER -d $DB_NAME"
+          --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -43,6 +35,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5.0.0
+
       - name: Run backup script
         run: |
           chmod +x ./init/backup.sh
@@ -50,6 +43,7 @@ jobs:
         env:
           DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
           BACKUP_PATH: ./backups/
+
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4
         with:
@@ -66,13 +60,13 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: $DB_USER
-          POSTGRES_PASSWORD: $DB_PASSWORD
-          POSTGRES_DB: $DB_NAME
+          POSTGRES_USER: bootcamp_admin
+          POSTGRES_PASSWORD: secure_password
+          POSTGRES_DB: bootcamp_db
         ports:
-          - $DB_PORT:5432
+          - 5434:5432
         options: >-
-          --health-cmd="pg_isready -U $DB_USER -d $DB_NAME"
+          --health-cmd="pg_isready -U bootcamp_admin -d bootcamp_db"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -83,13 +77,16 @@ jobs:
         with:
           name: db-backup-${{ github.run_id }}
           path: ./backups/
+
       - name: Checkout repository
         uses: actions/checkout@v5.0.0
+
       - name: Download latest backup
         uses: actions/download-artifact@v4
         with:
           name: db-backup-${{ github.run_id }}
           path: ./backups/
+
       - name: Verify latest backup checksum
         run: |
           echo "🔍 Verifying latest backup checksum..."
@@ -99,7 +96,11 @@ jobs:
             exit 1
           fi
           sha256sum -c "$CHECKSUM_FILE"
+
       - name: Run restore script
         run: |
           chmod +x ./init/restore.sh
           ./init/restore.sh
+        env:
+          DATABASE_URL: postgres://bootcamp_admin:secure_password@localhost:5434/bootcamp_db
+          BACKUP_PATH: ./backups/
