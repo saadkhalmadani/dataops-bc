@@ -16,17 +16,19 @@ env:
   POSTGRES_USER: ${{secrets.POSTGRES_USER }}
   POSTGRES_PASSWORD: ${{secrets.POSTGRES_PASSWORD }}
   POSTGRES_DB: ${{secrets.POSTGRES_DB }}
-  DATABASE_URL: postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5434/$POSTGRES_DB
-  BACKUP_PATH: ./backups/
 
 jobs:
 
   backup:
-
     runs-on: ubuntu-24.04
+
     services:
       postgres:
         image: postgres:15
+        env:
+          POSTGRES_USER: $POSTGRES_USER
+          POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+          POSTGRES_DB: $POSTGRES_DB
         ports:
           - 5434:5432
         options: >-
@@ -38,18 +40,23 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5.0.0
+
       - name: Run backup script
         run: |
           chmod +x ./init/backup.sh
           ./init/backup.sh
-      - name: Upload backup artifact 
+        env:
+          DATABASE_URL: postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5434/$POSTGRES_DB
+          BACKUP_PATH: ./backups/
+
+      - name: Upload backup artifact
         uses: actions/upload-artifact@v4.0.0
         with:
           name: db-backup-${{ github.run_id }}
           path: ./backups/
 
   restore:
-
+    
     runs-on: ubuntu-24.04
 
     needs: backup
@@ -58,6 +65,10 @@ jobs:
     services:
       postgres:
         image: postgres:15
+        env:
+          POSTGRES_USER: $POOSTGRES_USER
+          POSTGRES_PASSWORD: $POSTGRES_PASSWORD
+          POSTGRES_DB: $POSTGRES_DB
         ports:
           - 5434:5432
         options: >-
@@ -67,8 +78,7 @@ jobs:
           --health-retries=5
 
     steps:
-
-      - name: Download latest backup artifact
+      - name: Download latest backup
         uses: actions/download-artifact@v4
         with:
           name: db-backup-${{ github.run_id }}
@@ -77,7 +87,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5.0.0
 
-      - name: Download latest backup artifact
+      - name: Download latest backup
         uses: actions/download-artifact@v4
         with:
           name: db-backup-${{ github.run_id }}
@@ -97,3 +107,6 @@ jobs:
         run: |
           chmod +x ./init/restore.sh
           ./init/restore.sh
+        env:
+          DATABASE_URL: postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5434/$POSTGRES_DB
+          BACKUP_PATH: ./backups/
