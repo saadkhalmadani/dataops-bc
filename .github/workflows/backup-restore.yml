@@ -1,5 +1,4 @@
 name: Backup & Restore Database
-
 on:
   workflow_dispatch:
     inputs:
