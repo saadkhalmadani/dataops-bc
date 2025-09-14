@@ -16,9 +16,9 @@ env:
   POSTGRES_USER: ${{secrets.POSTGRES_USER }}
   POSTGRES_PASSWORD: ${{secrets.POSTGRES_PASSWORD }}
   POSTGRES_DB: ${{secrets.POSTGRES_DB }}
-  DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5434/${{ env.POSTGRES_DB }}
+  DATABASE_URL: postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@localhost:5434/$POSTGRES_DB
   BACKUP_PATH: ./backups/
-  
+
 jobs:
 
   backup:
