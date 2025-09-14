@@ -13,9 +13,9 @@ on:
           - 'false'
 
 env:
-  POSTGRES_USER: ${{secrets.POSTGRES_USER }}
-  POSTGRES_PASSWORD: ${{secrets.POSTGRES_PASSWORD }}
-  POSTGRES_DB: ${{secrets.POSTGRES_DB }}
+  POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+  POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+  POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
 
 jobs:
 
@@ -56,9 +56,7 @@ jobs:
           path: ./backups/
 
   restore:
-
     runs-on: ubuntu-24.04
-
     needs: backup
     if: github.event.inputs.restore == 'true'
 
@@ -104,3 +102,8 @@ jobs:
         env:
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5434/${{ env.POSTGRES_DB }}
           BACKUP_PATH: ./backups/
+
+      # Optional: Debug Postgres logs if the service fails
+      - name: Debug Postgres logs
+        if: failure()
+        run: docker logs $(docker ps -q --filter "ancestor=postgres:15")
