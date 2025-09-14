@@ -12,7 +12,7 @@ on:
           - 'true'
           - 'false'
 
-env:
+env:   # Global environment variables for the workflow 
   POSTGRES_USER: ${{secrets.POSTGRES_USER }}
   POSTGRES_PASSWORD: ${{secrets.POSTGRES_PASSWORD }}
   POSTGRES_DB: ${{secrets.POSTGRES_DB }}
@@ -20,6 +20,7 @@ env:
 jobs:
 
   backup:
+
     runs-on: ubuntu-24.04
 
     services:
@@ -38,6 +39,7 @@ jobs:
           --health-retries=5
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v5.0.0
 
@@ -78,6 +80,7 @@ jobs:
           --health-retries=5
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v5.0.0
 
