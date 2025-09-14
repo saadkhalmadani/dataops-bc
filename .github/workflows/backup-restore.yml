@@ -16,7 +16,9 @@ env:
   POSTGRES_USER: ${{secrets.POSTGRES_USER }}
   POSTGRES_PASSWORD: ${{secrets.POSTGRES_PASSWORD }}
   POSTGRES_DB: ${{secrets.POSTGRES_DB }}
-
+  DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5434/${{ env.POSTGRES_DB }}
+  BACKUP_PATH: ./backups/
+  
 jobs:
 
   backup:
@@ -38,6 +40,7 @@ jobs:
           --health-retries=5
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v5.0.0
 
@@ -45,9 +48,6 @@ jobs:
         run: |
           chmod +x ./init/backup.sh
           ./init/backup.sh
-        env:
-          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5434/${{ env.POSTGRES_DB }}
-          BACKUP_PATH: ./backups/
 
       - name: Upload backup artifact
         uses: actions/upload-artifact@v4.0.0
@@ -78,6 +78,7 @@ jobs:
           --health-retries=5
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v5.0.0
 
@@ -101,6 +102,3 @@ jobs:
         run: |
           chmod +x ./init/restore.sh
           ./init/restore.sh
-        env:
-          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5434/${{ env.POSTGRES_DB }}
-          BACKUP_PATH: ./backups/
