@@ -16,6 +16,7 @@ env:   # Global environment variables for the workflow
   POSTGRES_USER: ${{secrets.POSTGRES_USER }}
   POSTGRES_PASSWORD: ${{secrets.POSTGRES_PASSWORD }}
   POSTGRES_DB: ${{secrets.POSTGRES_DB }}
+  POSTGRES_PORT: ${{secrets.POSTGRES_PORT }}
 
 jobs:
 
@@ -31,7 +32,7 @@ jobs:
           POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
           POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:
-          - 5434:5432
+          - ${{ env.POSTGRES_PORT }}:5432
         options: >-
           --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
           --health-interval=10s
@@ -48,7 +49,7 @@ jobs:
           chmod +x ./init/backup.sh
           ./init/backup.sh
         env:
-          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5434/${{ env.POSTGRES_DB }}
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:${{ env.POSTGRES_PORT }}/${{ env.POSTGRES_DB }}
           BACKUP_PATH: ./backups/
 
       - name: Upload backup artifact
@@ -72,7 +73,7 @@ jobs:
           POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
           POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:
-          - 5434:5432
+          - ${{ env.POSTGRES_PORT }}:5432
         options: >-
           --health-cmd="pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"
           --health-interval=10s
@@ -105,5 +106,5 @@ jobs:
           chmod +x ./init/restore.sh
           ./init/restore.sh
         env:
-          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5434/${{ env.POSTGRES_DB }}
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:${{ env.POSTGRES_PORT }}/${{ env.POSTGRES_DB }}
           BACKUP_PATH: ./backups/
